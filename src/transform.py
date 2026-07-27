@@ -15,12 +15,17 @@ def build_preprocessor(
     numeric_cols: list[str],
     categorical_cols: list[str],
     scaler: str = "standard",
+    min_frequency: float | int | None = None,
 ) -> ColumnTransformer:
     """Create a ColumnTransformer that scales numerics and one-hot encodes cats.
 
     Parameters
     ----------
     scaler : "standard" (StandardScaler) or "minmax" (MinMaxScaler).
+    min_frequency : if given, categorical levels rarer than this (a proportion
+        when < 1, else a count) are collapsed into one "infrequent" column.
+        Needed for high-cardinality fields such as ``country`` (182 levels),
+        where a full one-hot expansion is mostly near-empty columns.
     """
     if scaler == "standard":
         num_scaler = StandardScaler()
@@ -31,17 +36,25 @@ def build_preprocessor(
     else:
         raise ValueError("scaler must be 'standard' or 'minmax'")
 
-    return ColumnTransformer(
-        transformers=[
-            ("num", num_scaler, numeric_cols),
+    transformers = [("num", num_scaler, numeric_cols)]
+    # An empty column list would still emit a fitted-but-useless encoder, so
+    # skip the step entirely for all-numeric data (e.g. the credit-card PCA set).
+    if categorical_cols:
+        transformers.append(
             (
                 "cat",
-                OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+                OneHotEncoder(
+                    handle_unknown="infrequent_if_exist"
+                    if min_frequency is not None
+                    else "ignore",
+                    sparse_output=False,
+                    min_frequency=min_frequency,
+                ),
                 categorical_cols,
-            ),
-        ],
-        remainder="drop",
-    )
+            )
+        )
+
+    return ColumnTransformer(transformers=transformers, remainder="drop")
 
 
 def fit_transform_frame(
