@@ -800,16 +800,312 @@ def modeling_nb() -> None:
 def shap_nb() -> None:
     cells = [
         md(
-            "# Model Explainability with SHAP (placeholder for Task 3)\n\n"
-            "Once a model is trained (Task 2), this notebook will use SHAP to "
-            "explain global feature importance (summary plot) and individual "
-            "predictions (force/waterfall plots) — e.g. confirming whether "
-            "`time_since_signup` and `device_velocity_24h` drive fraud scores."
+            "# Model Explainability with SHAP — Task 3\n\n"
+            "**Objective.** Interpret the Task-2 selected model (XGBoost + "
+            "`scale_pos_weight`) and turn the interpretation into business "
+            "recommendations.\n\n"
+            "**Structure**\n\n"
+            "1. Built-in (gain) feature importance — top 10.\n"
+            "2. SHAP global importance — beeswarm summary + mean |SHAP| bar.\n"
+            "3. SHAP force / waterfall plots for a **true positive**, a **false "
+            "positive** and a **false negative**.\n"
+            "4. Gain vs SHAP: where the two rankings disagree, and why.\n"
+            "5. Effect shape — *where* each driver flips sign, which is what makes "
+            "a threshold actionable.\n"
+            "6. Candidate rules scored against the labels, then recommendations.\n\n"
+            "**Why both importance measures.** Gain answers *\"which features did "
+            "the trees split on most profitably?\"* — global, unsigned, structural. "
+            "SHAP answers *\"how much did this feature move **this** prediction, "
+            "and which way?\"* Values are additive per prediction, so they support "
+            "a global ranking *and* per-transaction explanations. Where the two "
+            "disagree, the disagreement is itself the finding.\n\n"
+            "Reusable logic lives in [`src/explainability.py`](../src/explainability.py); "
+            "the batch runner that writes every figure is "
+            "[`scripts/explain_models.py`](../scripts/explain_models.py)."
         ),
         code(SETUP),
         code(
+            "import joblib\n"
             "import shap\n"
-            "print('shap', shap.__version__, '— scaffold ready for Task 3.')"
+            "from src import modeling as md, evaluation as ev, explainability as xai\n\n"
+            "print('shap', shap.__version__)\n"
+            "artifact = joblib.load(config.MODELS_DIR / 'fraud_selected.joblib')\n"
+            "pipe, threshold = artifact['pipeline'], artifact['threshold']\n"
+            "print('model:', artifact.get('model_key'), '| threshold:', round(threshold, 4))\n"
+            "print('steps:', list(dict(pipe.steps)))"
+        ),
+        md(
+            "## 1. Rebuild the Task-2 test split\n\n"
+            "Same `random_state`, so these are the exact rows the model was scored "
+            "on in Task 2 — the explanations describe the reported performance, not "
+            "a different sample."
+        ),
+        code(
+            "features = list(pipe.named_steps['preprocess'].feature_names_in_)\n"
+            "fraud = pd.read_csv(config.FRAUD_FEATURES)\n"
+            "X, y = md.split_features_target(fraud, config.FRAUD_TARGET, features)\n"
+            "for c in md.FRAUD_CATEGORICAL_COLS:\n"
+            "    X[c] = X[c].astype(str)\n"
+            "X_train, X_test, y_train, y_test = md.stratified_split(X, y, test_size=0.2)\n"
+            "scores = ev.predict_proba_positive(pipe, X_test)\n"
+            "print(f'test set: {len(X_test):,} rows, {int(y_test.sum()):,} frauds')\n"
+            "pd.Series(ev.classification_metrics(y_test, scores, threshold)).to_frame('selected model').round(4)"
+        ),
+        md(
+            "## 2. Built-in feature importance (baseline)\n\n"
+            "XGBoost's `feature_importances_` uses **gain**: the average "
+            "improvement in the split criterion each feature delivered. It is "
+            "unsigned — a high-gain feature could push scores up, down, or both."
+        ),
+        code(
+            "gain = xai.builtin_importance(pipe, importance_type='gain')\n"
+            "weight = xai.builtin_importance(pipe, importance_type='weight')\n"
+            "display(gain.head(10).rename('gain').to_frame().join(weight.rename('weight')).round(4))\n"
+            "xai.plot_builtin_importance(gain, 10,\n"
+            "    'Fraud_Data — XGBoost built-in importance (gain), top 10',\n"
+            "    FIG / 'fraud_builtin_importance.png')\n"
+            "plt.show()\n"
+            "print(f'top 3 features hold {gain.head(3).sum():.1%} of total gain')"
+        ),
+        md(
+            "## 3. SHAP — global explanation\n\n"
+            "`TreeExplainer` is **exact** for tree ensembles (no sampling "
+            "approximation). Values are in log-odds, additive: they sum to the "
+            "model's margin minus the base value.\n\n"
+            "In the beeswarm each dot is one transaction — x is that feature's "
+            "SHAP value (right = pushed toward fraud), colour is the feature's own "
+            "value. This is the plot that reveals whether *high* or *low* values "
+            "drive fraud, which the gain bar chart cannot show."
+        ),
+        code(
+            "expl = xai.shap_explanation(pipe, X_test)\n"
+            "print('SHAP values:', expl.values.shape, '| base value (log-odds):',\n"
+            "      round(float(expl.base_values[0]), 4))\n"
+            "shap_imp = xai.shap_importance(expl)\n"
+            "signed = xai.signed_shap_direction(expl)\n"
+            "display(shap_imp.head(10).rename('mean_abs_shap').to_frame()\n"
+            "        .join(signed.rename('mean_signed_shap')).round(4))"
+        ),
+        code(
+            "# Beeswarm on a 5k subsample — 30k overlapping dots is unreadable and\n"
+            "# the ranking it displays is unchanged.\n"
+            "plot_expl = xai.shap_explanation(pipe, X_test, sample_size=5000)\n"
+            "xai.plot_shap_summary(plot_expl, 12,\n"
+            "    'Fraud_Data — SHAP summary (beeswarm)', FIG / 'fraud_shap_summary.png')\n"
+            "plt.show()\n"
+            "xai.plot_shap_bar(plot_expl, 12,\n"
+            "    'Fraud_Data — SHAP global importance (mean |SHAP|)',\n"
+            "    FIG / 'fraud_shap_bar.png')\n"
+            "plt.show()"
+        ),
+        md(
+            "## 4. Gain vs SHAP — where the rankings disagree\n\n"
+            "`rank_gap` = gain rank − SHAP rank. A large positive gap means SHAP "
+            "rates the feature higher than gain does: the trees rarely split on it, "
+            "but when they do it moves the output."
+        ),
+        code(
+            "comparison = xai.importance_comparison(gain, shap_imp, top_n=15)\n"
+            "rho = xai.rank_correlation(gain, shap_imp)\n"
+            "print(f'Spearman rho(gain, mean|SHAP|) = {rho:.4f}')\n"
+            "display(comparison.round(4))\n"
+            "xai.plot_importance_comparison(comparison,\n"
+            "    f'Fraud_Data — gain vs mean|SHAP| (Spearman rho = {rho:.2f})',\n"
+            "    FIG / 'fraud_importance_comparison.png')\n"
+            "plt.show()"
+        ),
+        md(
+            "### The redundancy that explains most of the disagreement\n\n"
+            "`device_transaction_count` and `device_user_count` are ranked #1 and #2 "
+            "by gain but #1 and #4 by SHAP. The check below shows why."
+        ),
+        code(
+            "same = bool((fraud['device_transaction_count'] == fraud['device_user_count']).all())\n"
+            "print('device_transaction_count == device_user_count on every row:', same)\n"
+            "print('correlation:', round(float(fraud['device_transaction_count']\n"
+            "      .corr(fraud['device_user_count'])), 6))\n"
+            "print('\\nuser_transaction_count distinct values:',\n"
+            "      fraud['user_transaction_count'].unique())\n"
+            "print('\\nEvery user_id appears exactly once, so \"transactions per device\"')\n"
+            "print('and \"distinct users per device\" are the same column by construction.')\n"
+            "print('user_transaction_count is constant = 1: it carries zero information.')"
+        ),
+        md(
+            "## 5. Local explanations — TP / FP / FN\n\n"
+            "Extremes are chosen deliberately: the highest-scoring caught fraud "
+            "(clearest win), the highest-scoring legitimate row (worst false alarm), "
+            "and the lowest-scoring missed fraud (hardest miss). Feature values are "
+            "shown in **original units**, not standardised ones."
+        ),
+        code(
+            "cases = xai.select_cases(y_test, scores, threshold)\n"
+            "display(xai.case_table(y_test, scores, threshold, cases))\n"
+            "raw = X_test.reset_index(drop=True)"
+        ),
+        code(
+            "for name in ['true_positive', 'false_positive', 'false_negative']:\n"
+            "    pos = cases[name]\n"
+            "    print('=' * 78)\n"
+            "    print(f\"{name.replace('_', ' ').upper()} — fraud score {scores[pos]:.4f}\")\n"
+            "    display(xai.top_contributors(expl, pos, 5).round(4))\n"
+            "    print('raw values:', {k: raw.loc[pos, k] for k in\n"
+            "          ['time_since_signup', 'device_transaction_count',\n"
+            "           'device_velocity_24h', 'purchase_value', 'country']})\n"
+            "    xai.plot_force(expl, pos, f'Force plot: {name} (score {scores[pos]:.4f})',\n"
+            "                   FIG / f'fraud_force_{name}.png')\n"
+            "    plt.show()\n"
+            "    xai.plot_waterfall(expl, pos, 10,\n"
+            "                       f'Waterfall: {name} (score {scores[pos]:.4f})',\n"
+            "                       FIG / f'fraud_waterfall_{name}.png')\n"
+            "    plt.show()"
+        ),
+        md(
+            "### The instructive contrast\n\n"
+            "The false positive and the true negative have almost the **same** "
+            "`time_since_signup` (~7.6 h). The device feature alone decides the "
+            "outcome — which is the single clearest statement of what this model "
+            "has learned."
+        ),
+        code(
+            "rows = {n: cases[n] for n in ['false_positive', 'true_negative'] if n in cases}\n"
+            "display(pd.DataFrame({\n"
+            "    n: {**{k: raw.loc[p, k] for k in\n"
+            "            ['time_since_signup', 'device_transaction_count', 'device_velocity_24h']},\n"
+            "        'fraud_score': round(float(scores[p]), 4),\n"
+            "        'actual': int(y_test.to_numpy()[p])}\n"
+            "    for n, p in rows.items()}).round(3))"
+        ),
+        md(
+            "## 6. Effect shape — turning importance into thresholds\n\n"
+            "A ranking says *how much* a feature matters. To act on it you need to "
+            "know *where* its effect switches sign."
+        ),
+        code(
+            "TSU_BINS = [-1, 1, 6, 24, 168, 720, 1440, 3000]  # hours: 1h/6h/1d/1w/1m/2m\n"
+            "shape = xai.effect_shape(expl, 'time_since_signup', bins=TSU_BINS)\n"
+            "shape['fraud_rate'] = (pd.DataFrame({'y': y_test.to_numpy(),\n"
+            "        'b': pd.cut(raw['time_since_signup'], bins=TSU_BINS)})\n"
+            "        .groupby('b', observed=True)['y'].mean())\n"
+            "print('SHAP effect of time_since_signup, and the actual fraud rate:')\n"
+            "display(shape.round(4))\n"
+            "xai.plot_dependence(plot_expl, 'time_since_signup',\n"
+            "    'Fraud_Data — SHAP dependence: time_since_signup',\n"
+            "    FIG / 'fraud_dependence_time_since_signup.png')\n"
+            "plt.show()"
+        ),
+        code(
+            "for feat in ['device_transaction_count', 'device_velocity_24h']:\n"
+            "    s = xai.effect_shape(expl, feat)\n"
+            "    s['fraud_rate'] = (pd.DataFrame({'y': y_test.to_numpy(), 'v': raw[feat]})\n"
+            "                       .groupby('v')['y'].mean())\n"
+            "    print(f'--- {feat} ---')\n"
+            "    display(s.head(8).round(4))\n"
+            "    xai.plot_dependence(plot_expl, feat,\n"
+            "        f'Fraud_Data — SHAP dependence: {feat}',\n"
+            "        FIG / f'fraud_dependence_{feat}.png')\n"
+            "    plt.show()"
+        ),
+        md(
+            "## 7. From SHAP thresholds to scored rules\n\n"
+            "Each SHAP threshold becomes a candidate rule, scored on the **full** "
+            "dataset so the counts are stable. `precision` is how clean the flags "
+            "are; `legit_flagged` is the customer-friction cost."
+        ),
+        code(
+            "d, yf = fraud, fraud[config.FRAUD_TARGET]\n"
+            "rules = {\n"
+            "    'time_since_signup <= 1h': d['time_since_signup'] <= 1,\n"
+            "    'device_velocity_24h >= 2': d['device_velocity_24h'] >= 2,\n"
+            "    'device_transaction_count >= 2': d['device_transaction_count'] >= 2,\n"
+            "    'device_transaction_count >= 5': d['device_transaction_count'] >= 5,\n"
+            "    'tsu<=1h OR velocity>=2': (d['time_since_signup'] <= 1) | (d['device_velocity_24h'] >= 2),\n"
+            "    'tsu<=1h OR device_count>=2': (d['time_since_signup'] <= 1) | (d['device_transaction_count'] >= 2),\n"
+            "}\n"
+            "display(xai.rule_performance(yf, rules).round(4))"
+        ),
+        md(
+            "### What the model cannot see\n\n"
+            "The rows no device/time rule reaches are the model's recall ceiling. "
+            "Comparing fraud against legitimate traffic *within that region* shows "
+            "whether more modelling could help."
+        ),
+        code(
+            "uncovered = ~((d['time_since_signup'] <= 1) | (d['device_transaction_count'] >= 2))\n"
+            "cols = ['time_since_signup', 'device_transaction_count',\n"
+            "        'device_velocity_24h', 'purchase_value', 'age']\n"
+            "print(f'{int((uncovered & (yf == 1)).sum()):,} frauds '\n"
+            "      f'({(uncovered & (yf == 1)).sum() / yf.sum():.1%} of all fraud) sit here.')\n"
+            "display(pd.DataFrame({\n"
+            "    'fraud (uncovered)': d[uncovered & (yf == 1)][cols].median(),\n"
+            "    'legitimate (uncovered)': d[uncovered & (yf == 0)][cols].median(),\n"
+            "}).round(2))\n"
+            "print('The two columns are indistinguishable — this residual fraud is not')\n"
+            "print('reachable from these features, however the model is tuned.')"
+        ),
+        md(
+            "## 8. creditcard — the same analysis on anonymised features\n\n"
+            "The features are PCA components, so no recommendation can name a "
+            "business quantity. What SHAP still gives is *which* components carry "
+            "the signal, and — usefully — what the misses have in common."
+        ),
+        code(
+            "cc_art = joblib.load(config.MODELS_DIR / 'creditcard_selected.joblib')\n"
+            "cc_pipe, cc_thr = cc_art['pipeline'], cc_art['threshold']\n"
+            "cc_feats = list(cc_pipe.named_steps['preprocess'].feature_names_in_)\n"
+            "cc = pd.read_csv(config.CREDITCARD_CLEAN)\n"
+            "Xc, yc = md.split_features_target(cc, config.CREDITCARD_TARGET, cc_feats)\n"
+            "Xc_tr, Xc_te, yc_tr, yc_te = md.stratified_split(Xc, yc, test_size=0.2)\n"
+            "cc_scores = ev.predict_proba_positive(cc_pipe, Xc_te)\n"
+            "cc_gain = xai.builtin_importance(cc_pipe)\n"
+            "cc_expl = xai.shap_explanation(cc_pipe, Xc_te, sample_size=10000)\n"
+            "cc_shap = xai.shap_importance(cc_expl)\n"
+            "print(f'Spearman rho = {xai.rank_correlation(cc_gain, cc_shap):.4f}')\n"
+            "display(xai.importance_comparison(cc_gain, cc_shap, 10).round(4))"
+        ),
+        code(
+            "xai.plot_shap_summary(cc_expl, 12, 'creditcard — SHAP summary (beeswarm)',\n"
+            "    FIG / 'creditcard_shap_summary.png')\n"
+            "plt.show()\n"
+            "cc_cases = xai.select_cases(yc_te, cc_scores, cc_thr)\n"
+            "display(xai.case_table(yc_te, cc_scores, cc_thr, cc_cases))"
+        ),
+        code(
+            "# What do the missed frauds have in common? Amount is the one feature\n"
+            "# here that carries business meaning.\n"
+            "cc_raw = Xc_te.reset_index(drop=True)\n"
+            "yt = yc_te.to_numpy(); pred = cc_scores >= cc_thr\n"
+            "missed, caught = (yt == 1) & ~pred, (yt == 1) & pred\n"
+            "display(pd.DataFrame({\n"
+            "    'missed fraud': cc_raw['Amount'][missed].describe()[['count', '50%', 'mean']],\n"
+            "    'caught fraud': cc_raw['Amount'][caught].describe()[['count', '50%', 'mean']],\n"
+            "    'legitimate': cc_raw['Amount'][yt == 0].describe()[['count', '50%', 'mean']],\n"
+            "}).round(2))\n"
+            "f_all = cc[cc[config.CREDITCARD_TARGET] == 1]\n"
+            "l_all = cc[cc[config.CREDITCARD_TARGET] == 0]\n"
+            "print(f\"full data — share of fraud with Amount <= $1: {(f_all['Amount'] <= 1).mean():.1%}\")\n"
+            "print(f\"full data — share of legit with Amount <= $1: {(l_all['Amount'] <= 1).mean():.1%}\")"
+        ),
+        md(
+            "## 9. Interpretation and recommendations\n\n"
+            "The written interpretation, the top-5 driver discussion, the "
+            "counterintuitive findings and the full recommendation list are in "
+            "**[`reports/task3-report.md`](../reports/task3-report.md)**.\n\n"
+            "Headline findings:\n\n"
+            "1. **Three drivers, not five.** `device_transaction_count`, "
+            "`time_since_signup` and `device_velocity_24h` carry ~97% of total "
+            "mean |SHAP|. Ranks 4–5 are a duplicate column and a noise-level "
+            "feature.\n"
+            "2. **The effect is a cliff, not a gradient.** Purchases within 1 hour "
+            "of signup are 99.5% fraud; past that hour the fraud rate returns to "
+            "baseline immediately.\n"
+            "3. **Two engineered features were redundant or dead** — "
+            "`device_user_count` is identical to `device_transaction_count`, and "
+            "`user_transaction_count` is constant at 1.\n"
+            "4. **The model is a smoothed rule engine.** Two hard rules reproduce "
+            "its precision/recall almost exactly, which bounds what the ensemble "
+            "adds on this dataset.\n"
+            "5. **28% of fraud is unreachable** from these features — the uncovered "
+            "region is statistically identical to legitimate traffic."
         ),
     ]
     build("shap-explainability.ipynb", cells)

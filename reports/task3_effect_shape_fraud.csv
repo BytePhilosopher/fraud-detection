@@ -1,0 +1,47 @@
+bucket,n,mean_shap,direction,feature
+1.0,26332,-0.88133043,toward legit,device_transaction_count
+2.0,2188,1.1095397,toward fraud,device_transaction_count
+3.0,52,1.4855939,toward fraud,device_transaction_count
+4.0,2,1.7005005,toward fraud,device_transaction_count
+5.0,17,1.6123486,toward fraud,device_transaction_count
+6.0,34,1.4486456,toward fraud,device_transaction_count
+7.0,63,1.4119722,toward fraud,device_transaction_count
+8.0,118,1.5589648,toward fraud,device_transaction_count
+9.0,143,1.5481933,toward fraud,device_transaction_count
+10.0,173,1.5384694,toward fraud,device_transaction_count
+11.0,199,1.5438056,toward fraud,device_transaction_count
+12.0,196,1.5314386,toward fraud,device_transaction_count
+13.0,166,1.6041592,toward fraud,device_transaction_count
+14.0,153,1.5381732,toward fraud,device_transaction_count
+15.0,125,1.5223098,toward fraud,device_transaction_count
+16.0,130,1.5516129,toward fraud,device_transaction_count
+17.0,57,1.5505192,toward fraud,device_transaction_count
+18.0,31,1.5021391,toward fraud,device_transaction_count
+19.0,21,1.6210063,toward fraud,device_transaction_count
+20.0,23,1.8719834,toward fraud,device_transaction_count
+"(-1, 1]",1500,4.036988,toward fraud,time_since_signup
+"(1, 6]",59,1.3372817,toward fraud,time_since_signup
+"(6, 24]",186,0.40035382,toward fraud,time_since_signup
+"(24, 168]",1406,-0.2748117,toward legit,time_since_signup
+"(168, 720]",5600,-0.2533533,toward legit,time_since_signup
+"(720, 1440]",7158,-0.2234894,toward legit,time_since_signup
+"(1440, 3000]",14314,-0.23698667,toward legit,time_since_signup
+1.0,28864,-0.014813594,toward legit,device_velocity_24h
+2.0,176,0.80562156,toward fraud,device_velocity_24h
+3.0,135,2.4545906,toward fraud,device_velocity_24h
+4.0,142,2.4570832,toward fraud,device_velocity_24h
+5.0,151,2.4559243,toward fraud,device_velocity_24h
+6.0,128,2.4621725,toward fraud,device_velocity_24h
+7.0,129,2.4659379,toward fraud,device_velocity_24h
+8.0,126,2.4653466,toward fraud,device_velocity_24h
+9.0,94,2.4704573,toward fraud,device_velocity_24h
+10.0,86,2.470125,toward fraud,device_velocity_24h
+11.0,58,2.471523,toward fraud,device_velocity_24h
+12.0,47,2.4742126,toward fraud,device_velocity_24h
+13.0,33,2.099835,toward fraud,device_velocity_24h
+14.0,20,1.7187904,toward fraud,device_velocity_24h
+15.0,16,1.8053039,toward fraud,device_velocity_24h
+16.0,13,1.7654305,toward fraud,device_velocity_24h
+17.0,2,1.7584114,toward fraud,device_velocity_24h
+18.0,2,1.5296757,toward fraud,device_velocity_24h
+19.0,1,1.3373014,toward fraud,device_velocity_24h

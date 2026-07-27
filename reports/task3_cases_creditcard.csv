@@ -1,0 +1,5 @@
+case,row,actual,fraud_score,predicted
+true_positive,18427,1,0.9999985694885254,1
+false_positive,33810,0,0.9999898672103882,1
+false_negative,5187,1,4.365926542959642e-06,0
+true_negative,8722,0,5.609086173308242e-08,0
