@@ -8,8 +8,17 @@ notebooks call into it so they stay readable and reproducible.
 | `eda-fraud-data.ipynb` | Clean Fraud_Data, univariate/bivariate EDA, class-imbalance quantification | 1 |
 | `eda-creditcard.ipynb` | EDA + extreme-imbalance analysis for the credit-card data | 1 |
 | `feature-engineering.ipynb` | Geolocation merge, time/velocity features, scaling, encoding, train/test split, SMOTE | 1 |
-| `modeling.ipynb` | Baseline + ensemble models, AUC-PR/F1/recall evaluation (scaffold) | 2 |
+| `modeling.ipynb` | Stratified split, Logistic Regression baseline, XGBoost ensemble, 5-fold CV, threshold selection, model comparison | 2 |
 | `shap-explainability.ipynb` | Global & local SHAP explanations (scaffold) | 3 |
+
+`modeling.ipynb` narrates the protocol using the winning hyperparameters recorded
+in `reports/task2_tuning_*.csv`. The exhaustive grid searches that produce those
+files live in [`scripts/train_models.py`](../scripts/train_models.py):
+
+```bash
+python scripts/train_models.py            # both datasets (~26 min)
+python scripts/train_models.py --quick    # 10% sample, verifies the pipeline
+```
 
 ## Regenerate & execute
 
