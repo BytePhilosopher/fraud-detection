@@ -9,7 +9,7 @@ notebooks call into it so they stay readable and reproducible.
 | `eda-creditcard.ipynb` | EDA + extreme-imbalance analysis for the credit-card data | 1 |
 | `feature-engineering.ipynb` | Geolocation merge, time/velocity features, scaling, encoding, train/test split, SMOTE | 1 |
 | `modeling.ipynb` | Stratified split, Logistic Regression baseline, XGBoost ensemble, 5-fold CV, threshold selection, model comparison | 2 |
-| `shap-explainability.ipynb` | Global & local SHAP explanations (scaffold) | 3 |
+| `shap-explainability.ipynb` | Built-in importance, SHAP summary/force/waterfall, effect shapes, scored rules | 3 |
 
 `modeling.ipynb` narrates the protocol using the winning hyperparameters recorded
 in `reports/task2_tuning_*.csv`. The exhaustive grid searches that produce those
@@ -19,6 +19,12 @@ files live in [`scripts/train_models.py`](../scripts/train_models.py):
 python scripts/train_models.py            # both datasets (~26 min)
 python scripts/train_models.py --quick    # 10% sample, verifies the pipeline
 ```
+
+`shap-explainability.ipynb` loads the models saved by that run
+(`models/{dataset}_selected.joblib`) and rebuilds the same test split, so its
+explanations describe the exact predictions Task 2 reported.
+[`scripts/explain_models.py`](../scripts/explain_models.py) writes every Task-3
+figure and table in one batch (~4 min).
 
 ## Regenerate & execute
 

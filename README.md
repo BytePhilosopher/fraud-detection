@@ -17,7 +17,9 @@ Regression baseline, a tuned XGBoost ensemble, 5-fold stratified CV, threshold
 selection and model selection. See
 [`reports/task2-report.md`](reports/task2-report.md).
 
-**Task 3 — SHAP explainability:** scaffolded.
+**Task 3 — Model Explainability: complete.** Built-in importance, SHAP global and
+local explanations, gain-vs-SHAP comparison, and business recommendations. See
+[`reports/task3-report.md`](reports/task3-report.md).
 
 ## Repository layout
 
@@ -36,9 +38,10 @@ fraud-detection/
 │   ├── transform.py       # scaling + one-hot encoding (ColumnTransformer)
 │   ├── resampling.py      # SMOTE / undersampling (train only)
 │   ├── modeling.py        # stratified split, estimators, leakage-safe pipelines, tuning
-│   └── evaluation.py      # AUC-PR / F1 / confusion matrix, CV, threshold selection
-├── tests/                 # pytest suite for src/ (55 tests)
-├── scripts/               # build_notebooks.py, train_models.py
+│   ├── evaluation.py      # AUC-PR / F1 / confusion matrix, CV, threshold selection
+│   └── explainability.py  # gain importance, SHAP global/local, effect shape, rule scoring
+├── tests/                 # pytest suite for src/ (90 tests)
+├── scripts/               # build_notebooks.py, train_models.py, explain_models.py
 ├── models/                # saved pipelines + thresholds (gitignored)
 ├── reports/               # task reports, metric tables
 │   └── figures/           # generated EDA & evaluation figures
@@ -60,6 +63,7 @@ python scripts/build_notebooks.py          # generate notebooks
 jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb
 python scripts/train_models.py             # Task 2: train, tune & compare (~26 min)
 python scripts/train_models.py --quick     # 10% sample smoke test (~2 min)
+python scripts/explain_models.py           # Task 3: importance + SHAP figures (~4 min)
 ```
 
 ## Task 1 highlights
@@ -149,11 +153,48 @@ baseline stays in the repo as the bar any future model must clear.
 Full writeup, error profiles and deployment notes:
 [`reports/task2-report.md`](reports/task2-report.md).
 
+## Task 3 highlights
+
+SHAP (`TreeExplainer`, exact for tree ensembles) on the selected model, compared
+against XGBoost's built-in gain importance.
+
+### Top drivers — Fraud_Data
+| Rank | Feature | mean \|SHAP\| | Share | Gain rank |
+|---|---|---|---|---|
+| 1 | `device_transaction_count` | 0.9358 | 58.6% | 1 |
+| 2 | `time_since_signup` | 0.4322 | 27.1% | 3 |
+| 3 | `device_velocity_24h` | 0.1136 | 7.1% | 4 |
+| 4 | `device_user_count` | 0.0776 | 4.9% | 2 |
+| 5 | `purchase_value` | 0.0319 | 2.0% | 22 |
+
+Spearman ρ between the two rankings is only **0.42** — and each disagreement has
+a cause worth knowing.
+
+### Findings
+- **Three drivers, not five.** Ranks 1–3 hold **97.3%** of total mean |SHAP|.
+  Rank 4 is a *duplicate column*; rank 5 is at noise level (29× below rank 1).
+- **The signal is a cliff, not a gradient.** Purchases within **1 hour** of
+  signup are **99.52% fraud**; within 1 minute, **100.0%** across 7,600 rows.
+  Past the first hour the fraud rate falls to ~4.7%, *below* the 9.36% base rate.
+- **Two engineered features are redundant or dead.** `device_user_count` is
+  identical to `device_transaction_count` on every row (every `user_id` appears
+  exactly once), and `user_transaction_count` is the constant 1.
+- **The model is a smoothed two-rule engine.** `tsu ≤ 1h OR velocity ≥ 2` scores
+  98.9% precision / 53.8% recall against the model's 99.9% / 52.7%.
+- **28.3% of fraud is unreachable** from these features — in that region fraud and
+  legitimate traffic have matching medians on every column. That, not model
+  choice, is the ~71% recall ceiling.
+
+Recommendations (verification inside 1 h of signup, device-velocity blocking,
+rules-as-pre-filter, dropping the redundant features, and where to buy new
+signal) are in [`reports/task3-report.md`](reports/task3-report.md).
+
 ## Testing & CI
 
 `pytest` covers cleaning, geolocation (incl. range edge cases), feature
-engineering, transformation, resampling, model construction and evaluation — 55
-tests. One of them, `test_smote_does_not_change_prediction_row_count`, is a
-leakage guard: it fails if resampling ever escapes the `fit` path into
-`predict`. GitHub Actions runs the suite on every push/PR
-(`.github/workflows/unittests.yml`).
+engineering, transformation, resampling, model construction, evaluation and
+explainability — 90 tests. Two are guards worth naming:
+`test_smote_does_not_change_prediction_row_count` fails if resampling escapes the
+`fit` path into `predict`, and `test_shap_values_sum_to_model_margin` asserts SHAP
+additivity, so no reported attribution rests on an unchecked explanation. GitHub
+Actions runs the suite on every push/PR (`.github/workflows/unittests.yml`).

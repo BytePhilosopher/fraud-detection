@@ -1,0 +1,25 @@
+feature,value,shap,direction,case,fraud_score
+time_since_signup,0.0002777777777777,4.0411286,toward fraud,true_positive,0.9997835755348206
+device_velocity_24h,7.0,2.2229602,toward fraud,true_positive,0.9997835755348206
+device_transaction_count,20.0,1.9238229,toward fraud,true_positive,0.9997835755348206
+device_user_count,20.0,0.16238259,toward fraud,true_positive,0.9997835755348206
+hour_of_day,6.0,0.027527034,toward fraud,true_positive,0.9997835755348206
+purchase_value,47.0,0.021750778,toward fraud,true_positive,0.9997835755348206
+time_since_signup,7.616388888888889,3.9170706,toward fraud,false_positive,0.999667763710022
+device_velocity_24h,7.0,2.3448513,toward fraud,false_positive,0.999667763710022
+device_transaction_count,7.0,1.5898719,toward fraud,false_positive,0.999667763710022
+device_user_count,7.0,0.1184517,toward fraud,false_positive,0.999667763710022
+source_Direct,1.0,0.0752057,toward fraud,false_positive,0.999667763710022
+purchase_value,21.0,-0.027044922,toward legit,false_positive,0.999667763710022
+device_transaction_count,1.0,-2.93442,toward legit,false_negative,0.0764181986451149
+time_since_signup,4.779722222222222,1.113634,toward fraud,false_negative,0.0764181986451149
+device_user_count,1.0,-0.3960948,toward legit,false_negative,0.0764181986451149
+purchase_value,18.0,-0.1487855,toward legit,false_negative,0.0764181986451149
+country_infrequent_sklearn,0.0,-0.105976425,toward legit,false_negative,0.0764181986451149
+hour_of_day,9.0,0.07034807,toward fraud,false_negative,0.0764181986451149
+device_transaction_count,1.0,-3.0911572,toward legit,true_negative,0.04102781414985657
+time_since_signup,7.6425,0.894969,toward fraud,true_negative,0.04102781414985657
+device_user_count,1.0,-0.41644263,toward legit,true_negative,0.04102781414985657
+purchase_value,18.0,-0.19072337,toward legit,true_negative,0.04102781414985657
+hour_of_day,7.0,-0.12286133,toward legit,true_negative,0.04102781414985657
+country_infrequent_sklearn,0.0,-0.105855025,toward legit,true_negative,0.04102781414985657
